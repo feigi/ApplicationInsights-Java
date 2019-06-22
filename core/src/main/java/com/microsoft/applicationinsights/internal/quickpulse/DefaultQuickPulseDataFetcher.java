@@ -24,6 +24,7 @@ package com.microsoft.applicationinsights.internal.quickpulse;
 import java.util.Date;
 import java.util.concurrent.ArrayBlockingQueue;
 
+import com.microsoft.applicationinsights.EndpointConfiguration;
 import com.microsoft.applicationinsights.internal.util.PropertyHelper;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.http.client.methods.HttpPost;
@@ -35,7 +36,7 @@ import com.microsoft.applicationinsights.internal.logger.InternalLogger;
  * Created by gupele on 12/12/2016.
  */
 final class DefaultQuickPulseDataFetcher implements QuickPulseDataFetcher {
-    private final static String QP_BASE_URI = "https://rt.services.visualstudio.com/QuickPulseService.svc/";
+    private final static String QP_BASE_URI = EndpointConfiguration.DEFAULT_QUICKPULSE_ENDPOINT;
     private final String quickPulsePostUri;
     private final ArrayBlockingQueue<HttpPost> sendQueue;
     private final QuickPulseNetworkHelper networkHelper = new QuickPulseNetworkHelper();
@@ -43,7 +44,7 @@ final class DefaultQuickPulseDataFetcher implements QuickPulseDataFetcher {
     private final String sdkVersion;
 
     public DefaultQuickPulseDataFetcher(final ArrayBlockingQueue<HttpPost> sendQueue, final String ikey, final String instanceName, final String quickPulseId) {
-        quickPulsePostUri = QP_BASE_URI + "post?ikey=" + ikey;
+        quickPulsePostUri = QP_BASE_URI + "/post?ikey=" + ikey;
         this.sendQueue = sendQueue;
         sdkVersion = getCurrentSdkVersion();
         final StringBuilder sb = new StringBuilder();
