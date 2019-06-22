@@ -50,10 +50,20 @@ public enum QuickPulse implements Stoppable {
     private ApacheSender apacheSender;
     private QuickPulseDataSender quickPulseDataSender;
 
+    @Deprecated
     public void initialize() {
+        initialize(TelemetryConfiguration.getActive());
+    }
+
+    public void initialize(TelemetryConfiguration configuration) {
         if (!initialized) {
             synchronized (INSTANCE) {
+                if (!configuration.isQuickPulseEnabled()) {
+                    initialized = false;
+                    return;
+                }
                 if (!initialized) {
+                    InternalLogger.INSTANCE.trace("Initializing QuickPulse...");
                     initialized = true;
                     final String quickPulseId = UUID.randomUUID().toString().replace("-", "");
                     apacheSender = ApacheSenderFactory.INSTANCE.create();
@@ -66,10 +76,10 @@ public enum QuickPulse implements Stoppable {
                         instanceName = "Unknown host";
                     }
 
-                    final String ikey = TelemetryConfiguration.getActive().getInstrumentationKey();
+                    final String ikey = configuration.getInstrumentationKey();
 
-                    final QuickPulsePingSender quickPulsePingSender = new DefaultQuickPulsePingSender(apacheSender, instanceName, quickPulseId);
-                    final QuickPulseDataFetcher quickPulseDataFetcher = new DefaultQuickPulseDataFetcher(sendQueue, ikey, instanceName, quickPulseId);
+                    final QuickPulsePingSender quickPulsePingSender = new DefaultQuickPulsePingSender(apacheSender, instanceName, quickPulseId, ikey, configuration.getEndpoints());
+                    final QuickPulseDataFetcher quickPulseDataFetcher = new DefaultQuickPulseDataFetcher(sendQueue, ikey, instanceName, quickPulseId, configuration.getEndpoints());
 
                     final QuickPulseCoordinatorInitData coordinatorInitData =
                             new QuickPulseCoordinatorInitDataBuilder()

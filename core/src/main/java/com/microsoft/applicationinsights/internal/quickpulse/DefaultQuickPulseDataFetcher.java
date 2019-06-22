@@ -43,8 +43,12 @@ final class DefaultQuickPulseDataFetcher implements QuickPulseDataFetcher {
     private String postPrefix;
     private final String sdkVersion;
 
+    @Deprecated
     public DefaultQuickPulseDataFetcher(final ArrayBlockingQueue<HttpPost> sendQueue, final String ikey, final String instanceName, final String quickPulseId) {
-        quickPulsePostUri = QP_BASE_URI + "/post?ikey=" + ikey;
+        this(sendQueue, ikey, instanceName, quickPulseId, new EndpointConfiguration());
+    }
+    public DefaultQuickPulseDataFetcher(final ArrayBlockingQueue<HttpPost> sendQueue, final String ikey, final String instanceName, final String quickPulseId, final EndpointConfiguration endpoints) {
+        quickPulsePostUri = endpoints.getQuickPulseEndpoint() + "/post?ikey=" + ikey;
         this.sendQueue = sendQueue;
         sdkVersion = getCurrentSdkVersion();
         final StringBuilder sb = new StringBuilder();
