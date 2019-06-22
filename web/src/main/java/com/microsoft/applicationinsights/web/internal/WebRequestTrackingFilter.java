@@ -31,6 +31,8 @@ import com.microsoft.applicationinsights.internal.config.WebReflectionUtils;
 import com.microsoft.applicationinsights.internal.logger.InternalLogger;
 import com.microsoft.applicationinsights.internal.util.ThreadLocalCleaner;
 import com.microsoft.applicationinsights.web.extensibility.initializers.WebAppNameContextInitializer;
+import com.microsoft.applicationinsights.web.internal.correlation.CdsProfileFetcher;
+import com.microsoft.applicationinsights.web.internal.correlation.InstrumentationKeyResolver;
 import com.microsoft.applicationinsights.web.internal.httputils.AIHttpServletListener;
 import com.microsoft.applicationinsights.web.internal.httputils.ApplicationInsightsServletExtractor;
 import com.microsoft.applicationinsights.web.internal.httputils.HttpServerHandler;
@@ -111,16 +113,12 @@ public final class WebRequestTrackingFilter implements Filter {
      * @throws ServletException Exception that can be thrown from invoking the filters chain.
      */
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
-        if (req instanceof  HttpServletRequest && res instanceof HttpServletResponse) {
+        // Prevent duplicate Telemetry creation
+        boolean hasAlreadyBeenFiltered = req.getAttribute(ALREADY_FILTERED) != null;
+
+        if (!hasAlreadyBeenFiltered && req instanceof  HttpServletRequest && res instanceof HttpServletResponse) {
             HttpServletRequest httpRequest = (HttpServletRequest) req;
             HttpServletResponse httpResponse = (HttpServletResponse) res;
-            boolean hasAlreadyBeenFiltered = httpRequest.getAttribute(ALREADY_FILTERED) != null;
-
-            // Prevent duplicate Telemetry creation
-            if (hasAlreadyBeenFiltered) {
-                chain.doFilter(httpRequest, httpResponse);
-                return;
-            }
 
             RequestTelemetryContext requestTelemetryContext = handler.handleStart(httpRequest, httpResponse);
             AIHttpServletListener aiHttpServletListener = new AIHttpServletListener(handler, requestTelemetryContext);
@@ -166,11 +164,9 @@ public final class WebRequestTrackingFilter implements Filter {
             }
             configureWebAppNameContextInitializer(appName, configuration);
             telemetryClient = new TelemetryClient(configuration);
+            InstrumentationKeyResolver.INSTANCE.setProfileFetcher(new CdsProfileFetcher(configuration.getEndpoints()));
             webModulesContainer = new WebModulesContainer<>(configuration);
-            // Todo: Should we provide this via dependency injection? Can there be a scenario where user
-            // can provide his own handler?
-            handler = new HttpServerHandler<>(new ApplicationInsightsServletExtractor(), webModulesContainer,
-                                                cleaners, telemetryClient);
+            handler = new HttpServerHandler<>(new ApplicationInsightsServletExtractor(), webModulesContainer, cleaners, telemetryClient);
             if (StringUtils.isNotEmpty(config.getFilterName())) {
                 this.filterName = config.getFilterName();
             }
@@ -210,8 +206,7 @@ public final class WebRequestTrackingFilter implements Filter {
 
     private boolean initializeAgentIfAvailable() {
         //If Agent Jar is not present in the class path skip the process
-        if (!CommonUtils.isClassPresentOnClassPath(AGENT_LOCATOR_INTERFACE_NAME,
-            this.getClass().getClassLoader())) {
+        if (!CommonUtils.isClassPresentOnClassPath(AGENT_LOCATOR_INTERFACE_NAME, this.getClass().getClassLoader())) {
             InternalLogger.INSTANCE.trace("Agent was not found. Skipping the agent registration");
             return false;
         }
@@ -225,8 +220,7 @@ public final class WebRequestTrackingFilter implements Filter {
             throw td;
         } catch (Throwable t) {
             try {
-                InternalLogger.INSTANCE.error("Failed to register '%s', exception: '%s'",
-                    this.filterName, ExceptionUtils.getStackTrace(t));
+                InternalLogger.INSTANCE.error("Failed to register '%s': %s", this.filterName, ExceptionUtils.getStackTrace(t));
             } catch (ThreadDeath td) {
                 throw td;
             } catch (Throwable t2) {

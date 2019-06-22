@@ -46,10 +46,8 @@ import java.util.concurrent.TimeUnit;
 
 public class CdsProfileFetcher implements AppProfileFetcher {
 
-	private CloseableHttpAsyncClient httpClient;
-    private String endpointAddress;
-    private static final String ProfileQueryEndpointAppIdFormat = EndpointConfiguration.DEFAULT_PROFILE_QUERY_ENDPOINT_URI_PATH_FORMAT;
-    private static final String DefaultProfileQueryEndpointAddress = EndpointConfiguration.DEFAULT_TELEMETRY_ENDPOINT_HOST_URL;
+    private final EndpointConfiguration endpoints;
+    private CloseableHttpAsyncClient httpClient;
 
     // cache of tasks per ikey
     /* Visible for Testing */ final ConcurrentMap<String, Future<HttpResponse>> tasks;
@@ -59,19 +57,28 @@ public class CdsProfileFetcher implements AppProfileFetcher {
 
     private final PeriodicTaskPool taskThreadPool;
 
+    /**
+     * @deprecated Uses default endpoint. Should specify endpoint config.
+     */
+    @Deprecated
     public CdsProfileFetcher() {
+        this(new EndpointConfiguration());
+    }
+
+    public CdsProfileFetcher(EndpointConfiguration endpoints) {
+        this.endpoints = endpoints;
         taskThreadPool = new PeriodicTaskPool(1, CdsProfileFetcher.class.getSimpleName());
 
         RequestConfig requestConfig = RequestConfig.custom()
-            .setSocketTimeout(5000)
-            .setConnectTimeout(5000)
-            .setConnectionRequestTimeout(5000)
-            .build();
+                .setSocketTimeout(5000)
+                .setConnectTimeout(5000)
+                .setConnectionRequestTimeout(5000)
+                .build();
 
         setHttpClient(HttpAsyncClients.custom()
-            .setDefaultRequestConfig(requestConfig)
-            .useSystemProperties()
-            .build());
+                .setDefaultRequestConfig(requestConfig)
+                .useSystemProperties()
+                .build());
 
         long resetInterval = CdsRetryPolicy.INSTANCE.getResetPeriodInMinutes();
         PeriodicTaskPool.PeriodicRunnableTask cdsRetryClearTask = PeriodicTaskPool.PeriodicRunnableTask.createTask(new CachePurgingRunnable(),
@@ -79,7 +86,6 @@ public class CdsProfileFetcher implements AppProfileFetcher {
 
         this.tasks = new ConcurrentHashMap<>();
         this.failureCounters = new ConcurrentHashMap<>();
-        this.endpointAddress = DefaultProfileQueryEndpointAddress;
 
         ScheduledFuture<?> future = taskThreadPool.executePeriodicRunnableTask(cdsRetryClearTask);
         this.httpClient.start();
@@ -151,16 +157,23 @@ public class CdsProfileFetcher implements AppProfileFetcher {
         this.httpClient = client;
     }
 
+    /**
+     *
+     * @param endpoint
+     * @throws MalformedURLException
+     * @deprecated set endpoint in configuration
+     */
+    @Deprecated
     public void setEndpointAddress(String endpoint) throws MalformedURLException {
         // set endpoint address to the base address (e.g. https://dc.services.visualstudio.com)
         // later we will append the profile/ikey segment
         URL url = new URL(endpoint);
         String urlStr = url.toString();
-        this.endpointAddress = urlStr.substring(0, urlStr.length() - url.getFile().length());
+        endpoints.setProfileQueryEndpointHostUrl(urlStr.substring(0, urlStr.length() - url.getFile().length()));
     }
 
     private Future<HttpResponse> createFetchTask(String instrumentationKey) {
-		HttpGet request = new HttpGet(this.endpointAddress + String.format(ProfileQueryEndpointAppIdFormat, instrumentationKey));
+		HttpGet request = new HttpGet(String.format(endpoints.getProfileQueryEndpointFormat(), instrumentationKey));
         return this.httpClient.execute(request, null);
     }
 
