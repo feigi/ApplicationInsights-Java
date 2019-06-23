@@ -43,6 +43,7 @@ public class ApplicationInsightsXmlConfiguration {
     private SDKLoggerXmlElement sdkLogger;
     private SamplerXmlElement sampler;
     private QuickPulseXmlElement quickPulse;
+    private EndpointsXmlElement endpoints;
 
     private String schemaVersion;
 
@@ -93,6 +94,15 @@ public class ApplicationInsightsXmlConfiguration {
 
     public ChannelXmlElement getChannel() {
         return channel;
+    }
+
+    @XmlElement(name="Endpoints")
+    public void setEndpoints(EndpointsXmlElement endpoints) {
+        this.endpoints = endpoints;
+    }
+
+    public EndpointsXmlElement getEndpoints() {
+        return this.endpoints;
     }
 
     @XmlElement(name="Channel")
